@@ -1,0 +1,17 @@
+[project]
+name = "gdk-hello"
+version = "0.1.0"
+description = "GDK Python hello-world CLI tutorial"
+requires-python = ">=3.11"
+dependencies = [
+    "goose-sdk",
+    "click",
+    "python-dotenv",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = { include = ["src/gdk_hello"] }

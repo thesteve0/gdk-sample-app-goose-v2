@@ -23,6 +23,7 @@ gdk-sample-app-goose-build-v2/
   .env.example
   .gitignore
   .venv/
+  local-lamacpp-glimmer.json
   src/
     gdk_hello/
       __init__.py
@@ -30,12 +31,19 @@ gdk-sample-app-goose-build-v2/
   lessons/
 ```
 
-Only `src/` code is snapshotted per lesson for reference. Configuration files and the virtual environment remain at repo root.
+Only `src/` code is snapshotted per lesson for reference. Configuration files, the virtual environment, and provider JSON configs remain at repo root.
 
 ## Prerequisites
 - Lesson 1 complete: `pyproject.toml`, `.env.example`, `.gitignore` at repo root, `src/gdk_hello`
 - `uv venv` exists at repo root and `goose-sdk` is installed from source
 - llama.cpp server running and exposing OpenAI-compatible API
+
+### Provider config files
+- `local-lamacpp-glimmer.json` lives at repo root. It is a declarative provider config for an OpenAI-compatible llama.cpp endpoint.
+- JSON fields map to `.env` values:
+  - `base_url` in JSON → should match `OPENAI_BASE_URL` in `.env`
+  - `api_key_env` in JSON → name of env var, typically `OPENAI_API_KEY` in `.env`
+  - Model name is not stored in JSON; use `MODEL_NAME` from `.env` when building `ProviderModelConfig`.
 
 ## Step 2.1: Environment for llama.cpp
 
@@ -52,8 +60,8 @@ MODEL_NAME=<model-name-as-exposed-by-llama.cpp>
 ```
 
 Why these vars:
-- `OPENAI_BASE_URL` → `openai_provider` uses this for all requests. Must end with `/v1`.
-- `OPENAI_API_KEY` → Required by the provider even for local servers. Dummy is fine.
+- `OPENAI_BASE_URL` → Used for reference and for building declarative configs. The declarative JSON `base_url` is used for all requests; `openai_provider` factory is hard-coded to `https://api.openai.com`.
+- `OPENAI_API_KEY` → Required by the provider even for local servers. Dummy is fine; declarative config can set `requires_auth: false`.
 - `MODEL_NAME` → Must match the model name llama.cpp returns. Check with `curl http://127.0.0.1:8080/v1/models`.
 
 Load env in Python with `python-dotenv`:
@@ -70,7 +78,8 @@ Reference implementations and type definitions:
 - README: https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/README.md
 
 Key types from `goose`:
-- `openai_provider(api_key: str) -> Provider` — factory for OpenAI-compatible provider. Base URL is read from `OPENAI_BASE_URL` env var by the provider implementation.
+- `declarative_provider_from_json(json: str) -> Provider` — factory for providers defined via JSON config. Supports `engine: "openai"` with `base_url`, `api_key_env`, etc. Used for OpenAI-compatible local servers.
+- `openai_provider(api_key: str) -> Provider` — factory for OpenAI cloud provider. Hard-coded to `https://api.openai.com`, does not accept a URL.
 - `ProviderModelConfig(model_name: str, context_limit: Optional[int]=None, temperature: Optional[float]=None, max_tokens: Optional[int]=None, ...)` — model config
 - `ProviderMessage(role: MessageRole, content: List[MessageContent])`
   - Roles: `MessageRole.USER`, `MessageRole.ASSISTANT`, `MessageRole.TOOL`
@@ -85,17 +94,32 @@ Smoke test does NOT need to handle streaming yet, only instantiate provider and 
 
 Create a small script under `src/gdk_hello/` or a temporary file for testing. Do NOT copy-paste; write it yourself.
 
+For OpenAI-compatible local servers the UniFFI `openai_provider` factory is hard-coded to `https://api.openai.com`. Base URL is **not** configurable via that factory. Use the declarative constructor for local llama.cpp.
+
+Repo root file:
+`local-lamacpp-glimmer.json`
+
 Reference the official example for exact signatures:
 - Example: https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/examples/uniffi/provider.py
+- API reference and source of truth:
+  - `declarative_provider_from_json(json: str) -> Provider` – source `crates/goose-sdk/src/bindings.rs` `declarative_provider_from_json` and docs https://goose-docs.ai/docs/gdk/sdk/api-reference?version=0.1&language=python#fn-declarative-provider-from-json
+  - `ProviderModelConfig` – source `crates/goose-sdk/src/bindings.rs` `ProviderModelConfig` and docs https://goose-docs.ai/docs/gdk/sdk/api-reference?version=0.1&language=python#providermodelconfig
+  - `ProviderMessage` / `MessageRole` / `MessageContent` – source `crates/goose-sdk/src/bindings.rs` and docs https://goose-docs.ai/docs/gdk/sdk/api-reference?version=0.1&language=python#providermessage
+  - `Provider.stream(model, system, messages, tools) -> ProviderStream` – docs https://goose-docs.ai/docs/gdk/sdk/api-reference?version=0.1&language=python#providerstream
+  - `ProviderStream.next_chunk() -> Optional[StreamChunk]` – docs https://goose-docs.ai/docs/gdk/sdk/api-reference?version=0.1&language=python#providerstream
+  - Generated API data: `documentation/src/data/gdk-api.json` via `documentation/automation/gdk-api/generate.py`
+
+Note: `openai_provider` does NOT accept a URL and is hard-coded to `https://api.openai.com`. For OpenAI-compatible endpoints use `declarative_provider_from_json` with a JSON config that specifies `engine: "openai"` and `base_url`. `ProviderModelConfig` is for model parameters only, not connection parameters.
 
 Steps to implement:
-1. Load environment variables.
-2. Import `openai_provider`, `ProviderModelConfig`, `ProviderMessage`, `MessageRole`, `MessageContent` from `goose`.
-3. Build config:
-   - Read `OPENAI_API_KEY` and `MODEL_NAME` from env. `OPENAI_BASE_URL` is used by the provider via env.
+1. Load environment variables with `python-dotenv`.
+2. Import `declarative_provider_from_json`, `ProviderModelConfig`, `ProviderMessage`, `MessageRole`, `MessageContent` from `goose`.
+3. Load the declarative config:
+   - `with open("local-lamacpp-glimmer.json") as f: provider_json = f.read()`
+   - `provider = declarative_provider_from_json(provider_json)`
+4. Build config:
+   - Read `MODEL_NAME` from env for verification. Base URL and auth come from the JSON file.
    - Create `ProviderModelConfig(model_name=MODEL_NAME)`
-4. Instantiate provider:
-   - `provider = openai_provider(api_key=OPENAI_API_KEY)`
 5. Validate:
    - Print config values to confirm they loaded.
    - Attempt to create a stream with a minimal user message, e.g. "ping".
