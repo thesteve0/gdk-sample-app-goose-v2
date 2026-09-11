@@ -1,14 +1,14 @@
 {
-  "name": "custom_llama-glimmer",
+  "name": "custom_aa_llama_qwen3_6-35b",
   "engine": "openai",
-  "display_name": "llama-glimmer",
-  "description": "Custom llama-glimmer provider",
+  "display_name": "AA Llama Qwen3.6-35B",
+  "description": "Custom AA Llama Qwen3.6-35B provider",
   "api_key_env": "",
-  "base_url": "http://localhost:8080",
+  "base_url": "http://127.0.0.1:8080",
   "models": [
     {
-      "name": "bartowski/Muse-Glimmer-30B-GGUF:Q8_0",
-      "context_limit": 128000,
+      "name": "unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q6_K_XL",
+      "context_limit": null,
       "input_token_cost": null,
       "output_token_cost": null,
       "currency": null,
@@ -28,5 +28,7 @@
   "model_doc_link": null,
   "setup_steps": [],
   "fast_model": null,
-  "preserves_thinking": true
+  "preserves_thinking": true,
+  "emit_clear_thinking": false,
+  "setup": null
 }
