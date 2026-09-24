@@ -37,12 +37,12 @@ custom_aa_llama_qwen3_6-35b.json
 ## Prerequisites
 
 - Lesson 1 is complete.
-- `goose-sdk==0.1.0a8` is installed.
+- `goose-sdk==0.1.0a9` is installed.
 - A compatible provider is running at the `base_url` in the provider JSON.
 
 ## Why the HTTP request is explicit
 
-The Python `Provider` object in `goose-sdk==0.1.0a8` exposes inference operations such as `stream()` and `complete()`, but it does not expose a public method for listing models. Therefore, this lesson creates the GDK provider to validate its declarative configuration and then queries the provider's standard OpenAI-compatible models endpoint directly.
+The Python `Provider` object in `goose-sdk==0.1.0a9` exposes inference operations such as `stream()` and `complete()`, but it does not expose a public method for listing models. Therefore, this lesson creates the GDK provider to validate its declarative configuration and then queries the provider's standard OpenAI-compatible models endpoint directly.
 
 ## Step 2.1: Write the smoke test
 

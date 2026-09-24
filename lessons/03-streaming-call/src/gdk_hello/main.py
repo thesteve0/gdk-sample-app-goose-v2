@@ -50,7 +50,10 @@ async def main() -> None:
             role=MessageRole.USER,
             content=[
                 MessageContent.TEXT(
-                    text="Should I build a Goose SDK application with Rust or with Python?"
+                    text=(
+                        "Should I build a Goose SDK application with Rust or with Python? "
+                        "Answer in no more than three sentences."
+                    )
                 )
             ],
         )

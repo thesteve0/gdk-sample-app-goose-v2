@@ -1,16 +1,22 @@
+import asyncio
 import json
 import sys
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import urlopen
 
 from dotenv import load_dotenv
-from goose import declarative_provider_from_json
+from goose import (
+    declarative_provider_from_json,
+    MessageContent,
+    MessageRole,
+    ProviderMessage,
+    ProviderModelConfig,
+    StreamChunk,
+)
 
 DEFAULT_PROVIDER_CONFIG = Path("custom_aa_llama_qwen3_6-35b.json")
 
 
-def main() -> None:
+async def main() -> None:
     load_dotenv()
 
     if len(sys.argv) > 2:
@@ -30,35 +36,61 @@ def main() -> None:
     provider_json = provider_config_path.read_text()
     provider_config = json.loads(provider_json)
 
-    # Parse the declarative configuration with GDK. This does not make a
-    # network request, but it confirms that GDK accepts the provider config.
+    # The provider JSON configures the endpoint and lists its available models,
+    # while ProviderModelConfig selects a model for this request. The SDK needs
+    # both because it does not implicitly select the first model in the list.
     provider = declarative_provider_from_json(provider_json)
+    model = ProviderModelConfig(
+        model_name=provider_config["models"][0]["name"]
+    )
 
-    models_url = f"{provider_config['base_url'].rstrip('/')}/v1/models"
-
-    try:
-        with urlopen(models_url, timeout=5) as response:
-            payload = json.load(response)
-    except (HTTPError, URLError) as error:
-        raise SystemExit(f"Provider smoke test failed: {error}") from error
-
-    available_models = [model["id"] for model in payload.get("data", [])]
-    if not available_models:
-        raise SystemExit("Provider is reachable but returned no models")
-
-    configured_models = [model["name"] for model in provider_config["models"]]
-    missing_models = sorted(set(configured_models) - set(available_models))
-    if missing_models:
-        raise SystemExit(
-            "Provider is reachable, but configured model(s) were not found: "
-            + ", ".join(missing_models)
+    # Build the user message
+    messages = [
+        ProviderMessage(
+            role=MessageRole.USER,
+            content=[
+                MessageContent.TEXT(
+                    text=(
+                        "Should I build a Goose SDK application with Rust or with Python? "
+                        "Answer in no more than three sentences."
+                    )
+                )
+            ],
         )
+    ]
 
-    print(f"Connected to provider: {provider.name()}")
-    print("Available models:")
-    for model_name in available_models:
-        print(f"- {model_name}")
+    # Stream the response
+    stream = await provider.stream(
+        model=model,
+        system="you are an expert on the goose SDK",
+        messages=messages,
+        tools=[],
+    )
+    print("Streaming response...", file=sys.stderr)
+
+    saw_text = False
+    saw_end = False
+    try:
+        while chunk := await stream.next_chunk():
+            if isinstance(chunk, StreamChunk.TEXT_CHUNK):
+                saw_text = True
+                print(chunk.text, end="", flush=True)
+            elif isinstance(chunk, StreamChunk.END_CHUNK):
+                saw_end = True
+                if chunk.usage:
+                    print(f"\n\nusage: {chunk.usage}", file=sys.stderr)
+            elif isinstance(chunk, StreamChunk.ERROR_CHUNK):
+                raise RuntimeError(chunk.error.message)
+    except Exception as e:
+        print(f"\n\nError during streaming: {e}", file=sys.stderr)
+        raise
+
+    if not saw_text:
+        raise RuntimeError("The stream completed without returning text")
+    if not saw_end:
+        raise RuntimeError("The stream ended without an end chunk")
+    print()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

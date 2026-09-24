@@ -24,19 +24,19 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "click" },
-    { name = "goose-sdk", specifier = "==0.1.0a8" },
+    { name = "goose-sdk", specifier = "==0.1.0a9" },
     { name = "python-dotenv" },
 ]
 
 [[package]]
 name = "goose-sdk"
-version = "0.1.0a8"
+version = "0.1.0a9"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/78/b45a92f3ef3b4ab953ac53d705777038ab8742e14158efe1b9f293619ffc/goose_sdk-0.1.0a8-py3-none-macosx_10_13_universal2.whl", hash = "sha256:bbec596f718954b39da1644bc1b7df88b4a3d28fafc5982f6da5e964d95e89fa", size = 4987014, upload-time = "2026-09-03T18:10:43.892Z" },
-    { url = "https://files.pythonhosted.org/packages/9e/9d/cce70b75f2dbb3d7f74da1e3b0c24e69eef00ff5c7368ae3086563356316/goose_sdk-0.1.0a8-py3-none-macosx_11_0_universal2.whl", hash = "sha256:29bc7317521cfe4875472064cf943bc9ae1880841092aafdc8ef05d604c1a32b", size = 4806152, upload-time = "2026-09-03T18:10:45.791Z" },
-    { url = "https://files.pythonhosted.org/packages/73/58/f45e7aa8fff2798089c50f1f8bb86dfaa94cdbd00f2addebaf91a265d145/goose_sdk-0.1.0a8-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:6f4f09047cd61a8b39bf0421df214c33be5dc1331afcf08506a2f1f3c33feb97", size = 5483236, upload-time = "2026-09-03T18:10:47.227Z" },
-    { url = "https://files.pythonhosted.org/packages/7a/2f/7b1176ab04433a1698b4ce1400485e3b58ba2100d8c19cd4da443b205439/goose_sdk-0.1.0a8-py3-none-win_amd64.whl", hash = "sha256:53d5423c111412f0e3e68c0d95574416901d440ea7056bb5c44c8f0dc41559d7", size = 4333658, upload-time = "2026-09-03T18:10:49.363Z" },
+    { url = "https://files.pythonhosted.org/packages/84/c5/795106a2b84d8c2561e3eb5e7180cf322d53e890b80e5e3cf422522cbd76/goose_sdk-0.1.0a9-py3-none-macosx_10_13_universal2.whl", hash = "sha256:c2aa70b68b0b5ffff3ee8ac2830ad1c78ad54df7975c37212b3a9b1c1c37f11c", size = 5012091, upload-time = "2026-09-09T15:03:58.558Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/7c/46b75553a20574a78dde3a484f5e985e5a74c7d43bd55a660846355dc64e/goose_sdk-0.1.0a9-py3-none-macosx_11_0_universal2.whl", hash = "sha256:ec013e02479cc95db53ed2cd6dcd9a03beb9a0bade944d8efdf85accfa39dfd0", size = 4817802, upload-time = "2026-09-09T15:04:00.476Z" },
+    { url = "https://files.pythonhosted.org/packages/3f/3c/ccdcdb9651efc6f3760f99b65eb8a9a81cf94e43f07a8f82e8fd75e8c0a8/goose_sdk-0.1.0a9-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:5d8295915656ac975b653b25371a2df4aabefeb3eab85a89eddc54a7d5e0115f", size = 5563316, upload-time = "2026-09-09T15:04:02.292Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/0a/a48fe64fbd8ff8a9bbdad209cf4d48846cc1728f0a6ed147c94576683323/goose_sdk-0.1.0a9-py3-none-win_amd64.whl", hash = "sha256:bd26931a1f160b6c92679b94d19222dbb275bfa99bde8d8f3349d53be6b34fec", size = 4344520, upload-time = "2026-09-09T15:04:04.414Z" },
 ]
 
 [[package]]

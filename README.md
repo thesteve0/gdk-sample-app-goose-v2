@@ -33,9 +33,9 @@ The curriculum will evolve as it is implemented and taught. Lessons may be added
 | Lesson | Topic | Status | Materials |
 |---:|---|---|---|
 | 1 | Project bootstrap with `uv` and a `src/` layout | Complete | [`lessons/01-bootstrap/`](lessons/01-bootstrap/) |
-| 2 | Provider configuration and connectivity smoke test | **Active / being revised** | [`lessons/02-provider-smoke-test/`](lessons/02-provider-smoke-test/) |
-| 3 | First streaming model call | Draft | [`lessons/03-streaming-call/`](lessons/03-streaming-call/) |
-| 4 | System instructions, message roles, and multi-turn conversation | Planned | — |
+| 2 | Provider configuration and connectivity smoke test | Complete | [`lessons/02-provider-smoke-test/`](lessons/02-provider-smoke-test/) |
+| 3 | First streaming model call | Complete | [`lessons/03-streaming-call/`](lessons/03-streaming-call/) |
+| 4 | System instructions, message roles, and multi-turn conversation | **Active** | [`lessons/04-conversation/`](lessons/04-conversation/) |
 | 5 | Explicit model selection with `--model` | Planned | — |
 | 6 | Defining a provider tool | Planned | — |
 | 7 | Executing tools and returning results | Planned | — |
@@ -57,7 +57,8 @@ The curriculum will evolve as it is implemented and taught. Lessons may be added
 ├── lessons/
 │   ├── 01-bootstrap/
 │   ├── 02-provider-smoke-test/
-│   └── 03-streaming-call/
+│   ├── 03-streaming-call/
+│   └── 04-conversation/
 ├── instructor-notes/         # instructor-only pacing and teaching guidance
 ├── custom_aa_llama_qwen3_6-35b.json
 ├── .env.example
@@ -157,11 +158,9 @@ Unless its `LESSON.md` says otherwise, run lesson code from the repository root:
 uv run python -m src.gdk_hello.main
 ```
 
-The current provider smoke test expects the configured endpoint to be running. It parses the provider JSON, requests the provider’s OpenAI-compatible model list, and verifies that the models declared in the JSON are advertised by the endpoint.
+Lesson 4 is now prepared, while the root source remains at the completed Lesson 3 checkpoint until instruction begins. The Lesson 4 exercise makes two streaming requests: it captures the first assistant response, adds it to an ordered message history, and sends a context-dependent follow-up while keeping the system instruction separate from conversation messages.
 
-This early smoke test assumes a root-style `base_url` whose model list is available at `{base_url}/v1/models`. Its direct model-list request does not yet apply provider-defined authentication, custom headers, or alternate base paths. Use the bundled unauthenticated configuration or an equivalent endpoint for Lesson 2; broader provider support will be introduced as the application is structured further.
-
-A successful run prints the provider name and one or more model IDs. Exact output depends on your configuration.
+The configured endpoint must be running and support streaming. A successful run prints two assistant responses; usage diagnostics are also printed when the provider supplies them. Exact generated text depends on the selected provider and model.
 
 ## Validation philosophy
 

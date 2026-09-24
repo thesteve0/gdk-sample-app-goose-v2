@@ -18,7 +18,7 @@ Introduce the first inference request while keeping message construction and rol
 - Make one full streaming request and confirm the current pinned SDK’s Python variant names.
 - Confirm the provider supports streaming and returns text.
 - Check that the chosen model can answer promptly enough for a live demonstration.
-- Review the lesson prose against its complete `src/` solution; this lesson is still a draft and may contain stale wording.
+- Review the lesson prose against its complete `src/` solution and the pinned SDK before teaching.
 
 ## Discussion prompts
 

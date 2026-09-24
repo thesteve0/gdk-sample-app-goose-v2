@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "GDK Python hello-world CLI tutorial"
 requires-python = ">=3.11"
 dependencies = [
-    "goose-sdk==0.1.0a8",
+    "goose-sdk==0.1.0a9",
     "click",
     "python-dotenv",
 ]

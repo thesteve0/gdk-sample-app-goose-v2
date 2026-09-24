@@ -49,9 +49,9 @@ DEFAULT_PROVIDER_CONFIG = Path("custom_aa_llama_qwen3_6-35b.json")
 **Why these types:**
 - `declarative_provider_from_json` — creates the provider from your JSON config
 - `MessageContent.TEXT` — wraps plain-text content for a message
-- `MessageRole.USER` / `.ASSISTANT` — role of the message sender
-- `ProviderMessage` — carries role + content list to the provider
-- `ProviderModelConfig` — model parameters (name, context limit, temperature)
+- `MessageRole.USER` — marks this first message as user input
+- `ProviderMessage` — carries a role and content list to the provider
+- `ProviderModelConfig` — selects the model and can carry request-specific model settings
 - `StreamChunk.TEXT_CHUNK` / `.END_CHUNK` / `.ERROR_CHUNK` — response chunk variants
 
 ## Step 3.2: Build a ProviderMessage list
@@ -62,17 +62,24 @@ Each conversation turn is a list of `ProviderMessage`. For the first message fro
 messages = [
     ProviderMessage(
         role=MessageRole.USER,
-        content=[MessageContent.TEXT(text="Should I build a Goose SDK application with Rust or with Python?")],
+        content=[
+            MessageContent.TEXT(
+                text=(
+                    "Should I build a Goose SDK application with Rust or with Python? "
+                    "Answer in no more than three sentences."
+                )
+            )
+        ],
     )
 ]
 ```
 
 **Key details:**
-- `role` is an enum: `MessageRole.USER`, `MessageRole.ASSISTANT`, or `MessageRole.TOOL`
-- `content` is a **list** of `MessageContent` variants (supports text + images in one message)
-- Use `MessageContent.TEXT(text=...)` for plain text in `goose-sdk==0.1.0a8`.
+- This first request uses `MessageRole.USER`; Lesson 4 introduces assistant messages and conversation history.
+- `content` is a **list** of `MessageContent` variants, so one message can carry more than one content block.
+- Use `MessageContent.TEXT(text=...)` for plain text in `goose-sdk==0.1.0a9`.
 
-Reference: [bindings.rs MessageContent](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (enum `MessageContent` with variant `Text { text: String }`)
+Reference: [the `goose-sdk==0.1.0a9` bindings](https://github.com/aaif-goose/goose/blob/13f4d26e1e70/crates/goose-sdk/src/bindings.rs) define `MessageContent` with a Rust `Text { text: String }` variant; the published Python wheel exposes that variant as `MessageContent.TEXT`.
 
 ## Step 3.3: Create the provider and model config
 
@@ -128,7 +135,7 @@ while chunk := await stream.next_chunk():
 | `StreamChunk.END_CHUNK` | `.usage: Optional[Usage]` — token counts, model name | Once at stream end |
 | `StreamChunk.ERROR_CHUNK` | `.error.message: str` — error description | If a provider error occurs |
 
-Other chunk variants exist for thinking and tool calls, but are not needed for this first streaming request. Reference: [bindings.rs StreamChunk](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (enum `StreamChunk`)
+Other chunk variants exist for thinking and tool calls, but are not needed for this first streaming request. See the [`goose-sdk==0.1.0a9` `StreamChunk` definition](https://github.com/aaif-goose/goose/blob/13f4d26e1e70/crates/goose-sdk/src/bindings.rs#L553-L575).
 
 ### Usage object fields
 
@@ -149,6 +156,7 @@ import json
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from goose import (
     declarative_provider_from_json,
     MessageContent,
@@ -194,7 +202,10 @@ async def main() -> None:
             role=MessageRole.USER,
             content=[
                 MessageContent.TEXT(
-                    text="Should I build a Goose SDK application with Rust or with Python?"
+                    text=(
+                        "Should I build a Goose SDK application with Rust or with Python? "
+                        "Answer in no more than three sentences."
+                    )
                 )
             ],
         )
@@ -256,7 +267,7 @@ uv run python -m src.gdk_hello.main path/to/provider.json
 - stdout: The model's streaming reply as plain text
 - stderr (at end): `usage:` line with token counts
 
-If the server is down or the model name doesn't match, you'll see an `ErrorChunk` instead of text.
+If the provider reports an error after streaming starts, it may arrive as an `ErrorChunk`. Connection and setup failures can also be raised directly by `provider.stream(...)` or `stream.next_chunk()`.
 
 ## Success criteria
 
@@ -268,24 +279,20 @@ If the server is down or the model name doesn't match, you'll see an `ErrorChunk
 
 ## Best practices
 
-- Always wrap stream logic in a try/except — network errors are common during development
-- Print non-text output (usage, errors) to stderr so stdout stays clean for captured text
+- Keep stream errors visible; this lesson logs an error before re-raising it rather than treating a partial response as success.
+- Print non-text output (usage, errors) to stderr so stdout stays clean for captured text.
 - Use `flush=True` with streaming text to avoid buffering delays
 - Keep `system`, `messages`, and `tools` as separate arguments — don't concatenate them
-- The `tools=[]` argument is required; an empty list is correct when no tools are defined (Lesson 5 covers tool definitions)
+- The `tools=[]` argument is required; an empty list is correct when no tools are defined (Lesson 6 covers tool definitions).
 
 ## Reference
 
-- SDK source: https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs
-- Python example (canonical): https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/examples/uniffi/provider.py
-- `StreamChunk` enum definition: [bindings.rs lines 554–580](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs)
-- `MessageContent` enum definition: [bindings.rs lines 198–237](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs)
+- [`goose-sdk==0.1.0a9` provider bindings](https://github.com/aaif-goose/goose/blob/13f4d26e1e70/crates/goose-sdk/src/bindings.rs)
+- [`goose-sdk==0.1.0a9` Python provider example](https://github.com/aaif-goose/goose/blob/13f4d26e1e70/crates/goose-sdk/examples/uniffi/provider.py)
 
 ## Next steps
-Once you understand the streaming fundamentals:
-- Lesson 4: System prompt and message roles — add multi-turn conversation with assistant responses
-- Lesson 5: Add first `ProviderTool` definition — enable the model to call custom functions
-- Lesson 6: Tool execution loop — parse tool requests from chunks, execute tools, send results back
+
+Lesson 4 separates system instructions from conversation messages, captures the first assistant response, and sends a follow-up request with the complete two-turn history. Explicit `--model` selection follows in Lesson 5; tools begin in Lesson 6.
 
 ## Check your understanding
 
