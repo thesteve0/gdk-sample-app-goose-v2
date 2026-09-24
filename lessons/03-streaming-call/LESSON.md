@@ -1,10 +1,10 @@
-# Lesson 3: Streaming Call Deep Dive
+# Lesson 3: First Streaming Call
 
 ## Goal
-Build on the working streaming smoke test from Lesson 2 by understanding how each piece works under the hood. Examine `ProviderMessage` construction, chunk type checking, usage parsing, and error handling patterns in detail.
+Build on Lesson 2's provider connectivity check by making the first inference request. Introduce the minimum message construction, model selection, and stream handling needed to receive a response; later lessons deepen message roles and multi-turn conversations.
 
 ## Context
-This lesson builds on Lessons 1 and 2. The same `src/gdk_hello` layout, shared venv at repo root, and `.env` / provider JSON config carry forward. Only new code is shown here; previously-created configuration files are not reproduced.
+This lesson builds on Lessons 1 and 2. The same `src/gdk_hello` layout, shared environment at the repository root, and provider JSON carry forward. Only new code is shown here; previously-created configuration files are not reproduced.
 
 ## Directory structure
 
@@ -15,13 +15,12 @@ lessons/03-streaming-call/
     gdk_hello/
       main.py          # streaming call implementation
 pyproject.toml        (shared from repo root)
-.env.example           (shared from repo root)
 custom_aa_llama_qwen3_6-35b.json   (shared from repo root)
 ```
 
 ## Prerequisites
-- Lessons 1–2 complete: venv with `goose-sdk`, `.env` populated, provider JSON at repo root
-- llama.cpp server running and accessible
+- Lessons 1–2 complete: environment with `goose-sdk` and provider JSON at the repository root
+- A compatible provider running and accessible
 
 ## Step 3.1: Import the right types
 
@@ -29,11 +28,11 @@ Open or create `src/gdk_hello/main.py` and start with these imports:
 
 ```python
 import asyncio
+import json
 import sys
-import os
-from dotenv import load_dotenv
 from pathlib import Path
 
+from dotenv import load_dotenv
 from goose import (
     declarative_provider_from_json,
     MessageContent,
@@ -42,15 +41,18 @@ from goose import (
     ProviderModelConfig,
     StreamChunk,
 )
+
+
+DEFAULT_PROVIDER_CONFIG = Path("custom_aa_llama_qwen3_6-35b.json")
 ```
 
 **Why these types:**
 - `declarative_provider_from_json` — creates the provider from your JSON config
-- `MessageContent.Text` — wraps plain-text content for a message
-- `MessageRole.User` / `.Assistant` — role of the message sender
+- `MessageContent.TEXT` — wraps plain-text content for a message
+- `MessageRole.USER` / `.ASSISTANT` — role of the message sender
 - `ProviderMessage` — carries role + content list to the provider
 - `ProviderModelConfig` — model parameters (name, context limit, temperature)
-- `StreamChunk.TextChunk` / `.EndChunk` / `.ErrorChunk` — response chunk variants
+- `StreamChunk.TEXT_CHUNK` / `.END_CHUNK` / `.ERROR_CHUNK` — response chunk variants
 
 ## Step 3.2: Build a ProviderMessage list
 
@@ -60,15 +62,15 @@ Each conversation turn is a list of `ProviderMessage`. For the first message fro
 messages = [
     ProviderMessage(
         role=MessageRole.USER,
-        content=[MessageContent.Text(text="Should I build a Goose SDK application with Rust or with Python?")],
+        content=[MessageContent.TEXT(text="Should I build a Goose SDK application with Rust or with Python?")],
     )
 ]
 ```
 
 **Key details:**
-- `role` is an enum: `MessageRole.User`, `MessageRole.Assistant`, or `MessageRole.Tool`
+- `role` is an enum: `MessageRole.USER`, `MessageRole.ASSISTANT`, or `MessageRole.TOOL`
 - `content` is a **list** of `MessageContent` variants (supports text + images in one message)
-- Use `MessageContent.Text(text=...)` for plain text — not `.TEXT()`. The Python bindings expose the Rust enum variant name (`Text`) directly as an attribute
+- Use `MessageContent.TEXT(text=...)` for plain text in `goose-sdk==0.1.0a8`.
 
 Reference: [bindings.rs MessageContent](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (enum `MessageContent` with variant `Text { text: String }`)
 
@@ -77,11 +79,13 @@ Reference: [bindings.rs MessageContent](https://github.com/aaif-goose/goose/blob
 Load your declarative config and build a `ProviderModelConfig`:
 
 ```python
-provider = declarative_provider_from_json(Path("custom_aa_llama_qwen3_6-35b.json").read_text())
-model = ProviderModelConfig(model_name=os.getenv("MODEL_NAME"))
+provider_json = DEFAULT_PROVIDER_CONFIG.read_text()
+provider_config = json.loads(provider_json)
+provider = declarative_provider_from_json(provider_json)
+model = ProviderModelConfig(model_name=provider_config["models"][0]["name"])
 ```
 
-**Note:** `OPENAI_BASE_URL` and auth come from the JSON config file. The `ProviderModelConfig` is for model parameters only (name, context limit, temperature, max tokens).
+**Note:** The provider endpoint, authentication behavior, and available model definitions come from the JSON config file. `ProviderModelConfig` selects one of those models for this request. This lesson deliberately uses the first configured model; a later lesson adds explicit model selection.
 
 ## Step 3.4: Call stream() and iterate chunks
 
@@ -101,11 +105,11 @@ Iterate over chunks. The stream returns one chunk at a time until it's exhausted
 
 ```python
 while chunk := await stream.next_chunk():
-    if isinstance(chunk, StreamChunk.TextChunk):
+    if isinstance(chunk, StreamChunk.TEXT_CHUNK):
         print(chunk.text, end="", flush=True)
-    elif isinstance(chunk, StreamChunk.EndChunk) and chunk.usage:
+    elif isinstance(chunk, StreamChunk.END_CHUNK) and chunk.usage:
         print(f"\n\nusage: {chunk.usage}", file=sys.stderr)
-    elif isinstance(chunk, StreamChunk.ErrorChunk):
+    elif isinstance(chunk, StreamChunk.ERROR_CHUNK):
         print(f"\n\nerror: {chunk.error.message}", file=sys.stderr)
 ```
 
@@ -120,11 +124,11 @@ while chunk := await stream.next_chunk():
 
 | Variant | What it carries | When it arrives |
 |---|---|---|
-| `StreamChunk.TextChunk` | `.text: str` — a fragment of the model's reply | Each turn during generation |
-| `StreamChunk.EndChunk` | `.usage: Optional[Usage]` — token counts, model name | Once at stream end |
-| `StreamChunk.ErrorChunk` | `.error.message: str` — error description | If a provider error occurs |
+| `StreamChunk.TEXT_CHUNK` | `.text: str` — a fragment of the model's reply | During generation |
+| `StreamChunk.END_CHUNK` | `.usage: Optional[Usage]` — token counts, model name | Once at stream end |
+| `StreamChunk.ERROR_CHUNK` | `.error.message: str` — error description | If a provider error occurs |
 
-Other chunk variants exist (`ThinkingChunk`, `RedactedThinkingChunk`, `ToolChunk`) but are not needed for this basic smoke test. Reference: [bindings.rs StreamChunk](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (enum `StreamChunk`)
+Other chunk variants exist for thinking and tool calls, but are not needed for this first streaming request. Reference: [bindings.rs StreamChunk](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (enum `StreamChunk`)
 
 ### Usage object fields
 
@@ -141,9 +145,8 @@ Put it all together in an async `main()`:
 
 ```python
 import asyncio
+import json
 import sys
-import os
-from dotenv import load_dotenv
 from pathlib import Path
 
 from goose import (
@@ -156,26 +159,41 @@ from goose import (
 )
 
 
+DEFAULT_PROVIDER_CONFIG = Path("custom_aa_llama_qwen3_6-35b.json")
+
+
 async def main() -> None:
     load_dotenv()
-    if not Path("custom_aa_llama_qwen3_6-35b.json").exists():
-        raise FileNotFoundError(
-            "Run this script from the repo root with "
-            "`python -m src.gdk_hello.main`"
+
+    if len(sys.argv) > 2:
+        raise SystemExit(
+            "Usage: uv run python -m src.gdk_hello.main [provider.json]"
         )
 
-    # Load provider and model config
-    provider = declarative_provider_from_json(
-        Path("custom_aa_llama_qwen3_6-35b.json").read_text()
+    provider_config_path = (
+        Path(sys.argv[1]) if len(sys.argv) == 2 else DEFAULT_PROVIDER_CONFIG
     )
-    model = ProviderModelConfig(model_name=os.getenv("MODEL_NAME"))
+    if not provider_config_path.exists():
+        raise SystemExit(
+            f"Provider configuration not found: {provider_config_path}. "
+            "Run from the repository root or provide a valid JSON path."
+        )
+
+    provider_json = provider_config_path.read_text()
+    provider_config = json.loads(provider_json)
+
+    # Load the provider and select the first model declared by its config.
+    provider = declarative_provider_from_json(provider_json)
+    model = ProviderModelConfig(
+        model_name=provider_config["models"][0]["name"]
+    )
 
     # Build the user message
     messages = [
         ProviderMessage(
             role=MessageRole.USER,
             content=[
-                MessageContent.Text(
+                MessageContent.TEXT(
                     text="Should I build a Goose SDK application with Rust or with Python?"
                 )
             ],
@@ -191,19 +209,27 @@ async def main() -> None:
     )
     print("Streaming response...", file=sys.stderr)
 
+    saw_text = False
+    saw_end = False
     try:
         while chunk := await stream.next_chunk():
-            if isinstance(chunk, StreamChunk.TextChunk):
+            if isinstance(chunk, StreamChunk.TEXT_CHUNK):
+                saw_text = True
                 print(chunk.text, end="", flush=True)
-            elif isinstance(chunk, StreamChunk.EndChunk) and chunk.usage:
-                print(f"\n\nusage: {chunk.usage}", file=sys.stderr)
-            elif isinstance(chunk, StreamChunk.ErrorChunk):
-                print(
-                    f"\n\nerror: {chunk.error.message}", file=sys.stderr
-                )
+            elif isinstance(chunk, StreamChunk.END_CHUNK):
+                saw_end = True
+                if chunk.usage:
+                    print(f"\n\nusage: {chunk.usage}", file=sys.stderr)
+            elif isinstance(chunk, StreamChunk.ERROR_CHUNK):
+                raise RuntimeError(chunk.error.message)
     except Exception as e:
         print(f"\n\nError during streaming: {e}", file=sys.stderr)
         raise
+
+    if not saw_text:
+        raise RuntimeError("The stream completed without returning text")
+    if not saw_end:
+        raise RuntimeError("The stream ended without an end chunk")
     print()
 
 
@@ -213,11 +239,16 @@ if __name__ == "__main__":
 
 ## Step 3.6: Run the script
 
-From repo root:
+From the repository root:
 
 ```bash
-cd /var/home/stpousty/git/gdk-sample-app-goose-build-v2
 uv run python -m src.gdk_hello.main
+```
+
+To override the bundled provider configuration:
+
+```bash
+uv run python -m src.gdk_hello.main path/to/provider.json
 ```
 
 **Expected output:**
@@ -226,6 +257,14 @@ uv run python -m src.gdk_hello.main
 - stderr (at end): `usage:` line with token counts
 
 If the server is down or the model name doesn't match, you'll see an `ErrorChunk` instead of text.
+
+## Success criteria
+
+- GDK loads the selected provider JSON.
+- The request uses the first model declared by that configuration.
+- At least one text chunk is printed to stdout.
+- The stream reaches normal completion; usage is printed when the provider supplies it.
+- No specific generated wording is required.
 
 ## Best practices
 
@@ -248,7 +287,8 @@ Once you understand the streaming fundamentals:
 - Lesson 5: Add first `ProviderTool` definition — enable the model to call custom functions
 - Lesson 6: Tool execution loop — parse tool requests from chunks, execute tools, send results back
 
-## Questions to ask before proceeding
-- Does your llama.cpp server return text chunks correctly?
-- Can you see usage stats in the `EndChunk` output?
-- Do you want multi-turn conversation (Lesson 4) or tool support (Lesson 5) next?
+## Check your understanding
+
+- Does your provider return text chunks correctly?
+- Can you identify whether it supplies usage data in the `EndChunk`?
+- Why does this lesson select the first configured model instead of reading a model name from `.env`?

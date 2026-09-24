@@ -1,0 +1,49 @@
+version = 1
+revision = 2
+requires-python = ">=3.11"
+
+[[package]]
+name = "click"
+version = "8.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/0e/7fa0ef50764b67090eca4114772a2abf8b6148198475e54c660b97caeee6/click-8.5.0.tar.gz", hash = "sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34", size = 382235, upload-time = "2026-08-26T13:33:14.56Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl", hash = "sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360", size = 125251, upload-time = "2026-08-26T13:33:12.928Z" },
+]
+
+[[package]]
+name = "gdk-hello"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "click" },
+    { name = "goose-sdk" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "click" },
+    { name = "goose-sdk", specifier = "==0.1.0a8" },
+    { name = "python-dotenv" },
+]
+
+[[package]]
+name = "goose-sdk"
+version = "0.1.0a8"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/01/78/b45a92f3ef3b4ab953ac53d705777038ab8742e14158efe1b9f293619ffc/goose_sdk-0.1.0a8-py3-none-macosx_10_13_universal2.whl", hash = "sha256:bbec596f718954b39da1644bc1b7df88b4a3d28fafc5982f6da5e964d95e89fa", size = 4987014, upload-time = "2026-09-03T18:10:43.892Z" },
+    { url = "https://files.pythonhosted.org/packages/9e/9d/cce70b75f2dbb3d7f74da1e3b0c24e69eef00ff5c7368ae3086563356316/goose_sdk-0.1.0a8-py3-none-macosx_11_0_universal2.whl", hash = "sha256:29bc7317521cfe4875472064cf943bc9ae1880841092aafdc8ef05d604c1a32b", size = 4806152, upload-time = "2026-09-03T18:10:45.791Z" },
+    { url = "https://files.pythonhosted.org/packages/73/58/f45e7aa8fff2798089c50f1f8bb86dfaa94cdbd00f2addebaf91a265d145/goose_sdk-0.1.0a8-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:6f4f09047cd61a8b39bf0421df214c33be5dc1331afcf08506a2f1f3c33feb97", size = 5483236, upload-time = "2026-09-03T18:10:47.227Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/2f/7b1176ab04433a1698b4ce1400485e3b58ba2100d8c19cd4da443b205439/goose_sdk-0.1.0a8-py3-none-win_amd64.whl", hash = "sha256:53d5423c111412f0e3e68c0d95574416901d440ea7056bb5c44c8f0dc41559d7", size = 4333658, upload-time = "2026-09-03T18:10:49.363Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/53/ed9d74092561d4b01a2ef1349d52cdbc135e526c245f366b089cfca6de49/python_dotenv-1.2.3.tar.gz", hash = "sha256:a20a594dabeaa385725aa239d5244871c143ecb356add8a20fcf23773a6c3a35", size = 58945, upload-time = "2026-08-16T16:54:54.067Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0d/17/c5c6b53ddc18f297992099b3d9ec16c855c0ccc83263a21fe4d1c625ec6c/python_dotenv-1.2.3-py3-none-any.whl", hash = "sha256:904552145e8bfed22162c09dab1c2b9b54fefa7b23ba780f4f26ca0316b0f0d9", size = 22780, upload-time = "2026-08-16T16:54:52.473Z" },
+]

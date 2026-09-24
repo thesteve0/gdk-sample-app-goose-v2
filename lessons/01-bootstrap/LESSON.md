@@ -1,11 +1,11 @@
 # Lesson 1: Project Bootstrap
 
 ## Goal
-Create a clean, best-practice Python project layout for a GDK agentic CLI app using `uv`, `src/` layout, and environment configuration.
+Create a clean Python project layout for a GDK agentic application using `uv`, a `src/` layout, and safe environment configuration.
 
 ## Directory structure
 
-Project files live at repo root, managed by `uv`. A snapshot copy is kept in `lessons/01-bootstrap/` for reference.
+Students work in the repository root, managed by `uv`. The complete reference implementation for this lesson is kept in `lessons/01-bootstrap/src/`.
 
 Repo root:
 ```
@@ -18,7 +18,7 @@ gdk-sample-app-goose-build-v2/
       __init__.py
       main.py
   lessons/
-    01-bootstrap/   # snapshot copy of files above
+    01-bootstrap/   # lesson explanation and complete solution
 ```
 
 
@@ -34,7 +34,7 @@ version = "0.1.0"
 description = "GDK Python hello-world CLI tutorial"
 requires-python = ">=3.11"
 dependencies = [
-    "goose-sdk",
+    "goose-sdk==0.1.0a8",
     "click",
     "python-dotenv",
 ]
@@ -59,13 +59,13 @@ package = true
 Create `.env.example` at repo root with:
 
 ```
-OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-OPENAI_API_KEY=sk-local-test
-MODEL_NAME=bartowski/Muse-Glimmer-30B-GGUF:Q8_0
+# Add API-key variables named by your provider JSON when authentication is
+# required. The bundled local provider does not require one.
+# EXAMPLE_PROVIDER_API_KEY=replace-me
 ```
 
 **Why:**
-We use an OpenAI-compatible local server. `OPENAI_API_KEY` is required by the provider even if it's a dummy value for local servers.
+Provider JSON will become the source of truth for endpoints and model names in Lesson 2. A local `.env` is reserved for real API-key values when a provider requires authentication; `.env.example` documents the pattern without containing a secret.
 
 ## Step 1.3: .gitignore
 
@@ -75,66 +75,35 @@ __pycache__/
 *.pyc
 .env
 .venv/
-uv.lock
+/.idea/
+/out/
 ```
 
 ## Step 1.4: src layout
 
-Create files at repo root:
-* `src/gdk_hello/__init__.py` - empty
-* `src/gdk_hello/main.py` - empty placeholder for later
+Create files at the repository root:
 
-## Step 1.5: Create venv with uv
+- `src/gdk_hello/__init__.py` — package marker
+- `src/gdk_hello/main.py` — a small entry point that prints `Hello from gdk_hello`
+
+## Step 1.5: Create the environment with uv
 
 From repo root:
 ```bash
-uv venv
-uv add click python-dotenv
+uv sync
 ```
 
-`uv` will detect the package from `pyproject.toml` at repo root. The snapshot is copied to `lessons/01-bootstrap/` for reference.
+`uv` detects the package from `pyproject.toml`, creates the shared virtual environment, and installs the versions in the committed `uv.lock`.
 
-This creates a shared venv for all lessons.
+This creates a shared environment for all lessons.
 
-### Installing goose-sdk
+The `goose-sdk` distribution installs the Python package imported as `goose`. The course pins a tested SDK version and updates it deliberately during course development.
 
-`goose-sdk` is now published to PyPI and can be installed directly:
+## Success criteria
 
-```bash
-cd /var/home/stpousty/git/gdk-sample-app-goose-build-v2
-uv add goose-sdk
-# or
-uv pip install goose-sdk
-```
-
-The package installs as `goose` and can be imported as `import goose`.
-
-#### Installing goose-sdk from source
-
-Building from source is still available for the latest development build or when you need a platform-specific wheel. The PyPI release previously only shipped a wheel for `macosx_11_0_arm64`; on Linux you can still build from source.
-
-You have the Goose source at `/var/home/stpousty/git/goose`. Build a local wheel with Just:
-
-```bash
-cd /var/home/stpousty/git/goose
-just --justfile crates/goose-sdk/justfile python-wheel
-```
-
-This creates:
-`/var/home/stpousty/git/goose/crates/goose-sdk/python/dist/goose_sdk-0.1.0a7-py3-none-linux_x86_64.whl`
-
-Install the wheel into the project's venv:
-```bash
-cd /var/home/stpousty/git/gdk-sample-app-goose-build-v2
-uv pip install /var/home/stpousty/git/goose/crates/goose-sdk/python/dist/goose_sdk-0.1.0a7-py3-none-linux_x86_64.whl
-```
-
-The package installs as `goose` and can be imported as `import goose`.
-
-**Why:**
-* GDK bindings are generated from Rust via UniFFI
-* Building locally avoids platform wheel limitations
-* The wheel is specific to your hardware, so building from source is the supported path for Linux
+- `uv sync` completes successfully.
+- `uv run python -m src.gdk_hello.main` prints `Hello from gdk_hello`.
+- You can identify where package source, dependencies, locked versions, lesson material, and local secrets belong.
 
 ## Next
 Once these files exist, we'll do a minimal provider smoke test in Lesson 2.

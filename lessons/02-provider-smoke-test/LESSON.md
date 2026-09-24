@@ -1,248 +1,162 @@
 # Lesson 2: Provider Smoke Test
 
 ## Goal
-Verify that the Goose Development Kit can connect to your OpenAI-compatible llama.cpp endpoint and produce streaming output. This lesson validates provider instantiation, message construction, and chunk iteration end-to-end.
+
+Verify that the local OpenAI-compatible provider is reachable and that it advertises the model configured for this project.
+
+This is intentionally only a smoke test. It does **not** construct messages, call a model completion, or process a response stream. Those concepts begin in Lesson 3.
+
+## What this test checks
+
+1. The declarative provider JSON can be parsed by GDK.
+2. The provider's OpenAI-compatible `GET /v1/models` endpoint is reachable.
+3. The endpoint returns at least one model.
+4. Every model named in the provider JSON is advertised by the endpoint.
+
+> A successful model-list request verifies server connectivity and model discovery, but it does not prove that inference works. Lesson 3 verifies inference with the first streaming call.
 
 ## Context
-This lesson builds directly on Lesson 1 bootstrap. We keep the same `src/gdk_hello` layout and shared venv at repo root. A snapshot copy of the working code is kept in `02-provider-smoke-test/` for reference; configuration files, `.venv`, and the provider JSON remain at repo root.
 
-## Directory structure
+This lesson builds on the project created in Lesson 1. Configuration remains at the repository root, while the completed lesson code is snapshotted here:
 
-Snapshot (reference):
-```
-02-provider-smoke-test/
-  __init__.py     - package marker
-  main.py         - working smoke test implementation
-```
-
-Repo root (shared across all lessons):
-```
-gdk-sample-app-goose-build-v2/
-  pyproject.toml                  # package config, goose-sdk==0.1.0a8
-  .env.example                    # template for local server env vars
-  .env                            # your actual env (gitignored)
-  .gitignore                      # excludes .env, __pycache__, .venv
-  custom_aa_llama_qwen3_6-35b.json   # declarative provider config
+```text
+lessons/02-provider-smoke-test/
+  LESSON.md
   src/
     gdk_hello/
       __init__.py
-      main.py                     # active source (mirrors snapshot)
-  lessons/
+      main.py
 ```
 
-Only `02-provider-smoke-test/` code is snapshotted for reference. Configuration files and the virtual environment live at repo root and are shared across all lessons.
+The shared provider configuration remains at the repository root:
+
+```text
+custom_aa_llama_qwen3_6-35b.json
+```
 
 ## Prerequisites
-- Lesson 1 complete: venv created with `uv venv`, packages installed
-- `goose-sdk` installed (from PyPI: `goose-sdk==0.1.0a8`)
-- llama.cpp server running at your configured base URL
 
-### Provider config file
-`custom_aa_llama_qwen3_6-35b.json` at repo root is a declarative provider config for an OpenAI-compatible llama.cpp endpoint. Key fields:
+- Lesson 1 is complete.
+- `goose-sdk==0.1.0a8` is installed.
+- A compatible provider is running at the `base_url` in the provider JSON.
 
-| JSON field | Purpose |
-|---|---|
-| `base_url` | Local server URL (e.g. `http://127.0.0.1:8080`) — NOT `.env.example`'s `/v1` suffix, the server handles that path |
-| `api_key_env` | Empty string here; `requires_auth: false` means no key needed for local server |
-| `supports_streaming` | `true` — this endpoint supports streaming responses |
-| `requires_auth` | `false` — no authentication token required for local use |
-| `models[0].name` | The model identifier used by llama.cpp |
+## Why the HTTP request is explicit
 
-### Environment variables
-`.env.example` at repo root:
-```
-OPENAI_BASE_URL=http://127.0.0.1:8080/v1
-OPENAI_API_KEY=sk-local-test
-MODEL_NAME=bartowski/Muse-Glimmer-30B-GGUF:Q8_0
-```
+The Python `Provider` object in `goose-sdk==0.1.0a8` exposes inference operations such as `stream()` and `complete()`, but it does not expose a public method for listing models. Therefore, this lesson creates the GDK provider to validate its declarative configuration and then queries the provider's standard OpenAI-compatible models endpoint directly.
 
-Create `.env` from the example and adjust values to match your llama.cpp setup:
-```bash
-cp .env.example .env
-```
+## Step 2.1: Write the smoke test
 
-Edit `.env`:
-- `OPENAI_BASE_URL` — matches your llama.cpp base URL (must include `/v1` for OpenAI-compatible endpoints)
-- `OPENAI_API_KEY` — dummy value is fine; the JSON config has `requires_auth: false`
-- `MODEL_NAME` — must match what llama.cpp exposes. Verify with:
-  ```bash
-  curl http://127.0.0.1:8080/v1/models
-  ```
-
-Load env in Python via `python-dotenv`:
-```python
-from dotenv import load_dotenv
-load_dotenv()  # loads .env from cwd (repo root)
-```
-
-## Step 2.1: Import the right types
+Create `src/gdk_hello/main.py` with:
 
 ```python
-import asyncio
-import os
+import json
 import sys
-from dotenv import load_dotenv
-from goose import declarative_provider_from_json, MessageContent, StreamChunk
-from goose import (
-    ProviderModelConfig,
-    ProviderMessage,
-    ProviderStream,
-    MessageRole,
-)
 from pathlib import Path
-```
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
-Key types:
-
-| Type | Purpose |
-|---|---|
-| `declarative_provider_from_json(json)` | Factory from JSON config; supports `engine: "openai"` with `base_url` for local servers. The `openai_provider()` factory is hard-coded to `https://api.openai.com` and won't work for local endpoints. |
-| `ProviderModelConfig(model_name)` | Model configuration — name only, plus optional params like `context_limit`, `temperature`, `max_tokens` |
-| `ProviderMessage(role, content)` | Carries a role + list of content items to the provider |
-| `MessageRole.USER` / `.ASSISTANT` / `.TOOL` | Message roles (enum) |
-| `MessageContent.TEXT(text=...)` | Plain text message content (enum variant — construct with `.TEXT()`) |
-| `ProviderStream` | Async iterable stream of response chunks |
-| `StreamChunk.TEXT_CHUNK` / `.END_CHUNK` / `.ERROR_CHUNK` | Chunk type classes, used with `isinstance()` |
-
-References:
-- SDK source: https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs
-- Python example: https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/examples/uniffi/provider.py
-- `ProviderMessage` / `MessageRole` / `MessageContent`: enum definitions in [bindings.rs](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (lines 191–237)
-- `StreamChunk`: variant definitions in [bindings.rs](https://github.com/aaif-goose/goose/blob/main/crates/goose-sdk/src/bindings.rs) (lines 554–580)
-
-## Step 2.2: Smoke test code
-
-The snapshot at `02-provider-smoke-test/main.py` contains the complete implementation. Read it to understand the flow, then write your own version in `src/gdk_hello/main.py`.
-
-```python
-import asyncio
-import os
-import sys
 from dotenv import load_dotenv
-from goose import declarative_provider_from_json, MessageContent, StreamChunk
-from goose import (
-    ProviderModelConfig,
-    ProviderMessage,
-    ProviderStream,
-    MessageRole,
-)
-from pathlib import Path
+from goose import declarative_provider_from_json
 
 
-async def main() -> None:
+DEFAULT_PROVIDER_CONFIG = Path("custom_aa_llama_qwen3_6-35b.json")
+
+
+def main() -> None:
     load_dotenv()
-    if not Path("custom_aa_llama_qwen3_6-35b.json").exists():
-        raise FileNotFoundError(
-            "Run from repo root with `python -m src.gdk_hello.main`"
+
+    if len(sys.argv) > 2:
+        raise SystemExit(
+            "Usage: uv run python -m src.gdk_hello.main [provider.json]"
         )
 
-    # 1. Load declarative provider config
-    provider = declarative_provider_from_json(
-        Path("custom_aa_llama_qwen3_6-35b.json").read_text()
+    provider_config_path = (
+        Path(sys.argv[1]) if len(sys.argv) == 2 else DEFAULT_PROVIDER_CONFIG
     )
-
-    # 2. Build model config (model name from .env)
-    model = ProviderModelConfig(model_name=os.getenv("MODEL_NAME"))
-
-    # 3. Build user message list
-    messages = [
-        ProviderMessage(
-            role=MessageRole.USER,
-            content=[MessageContent.TEXT(
-                text="Should I build a Goose SDK application with Rust or with Python?"
-            )],
+    if not provider_config_path.exists():
+        raise SystemExit(
+            f"Provider configuration not found: {provider_config_path}. "
+            "Run from the repository root or provide a valid JSON path."
         )
-    ]
 
-    # 4. Stream the response
-    stream = await provider.stream(
-        model=model,
-        system="you are an expert on the goose SDK",
-        messages=messages,
-        tools=[],
-    )
-    print("Streaming response...", file=sys.stderr)
+    provider_json = provider_config_path.read_text()
+    provider_config = json.loads(provider_json)
+
+    # Parse the declarative configuration with GDK. This does not make a
+    # network request, but it confirms that GDK accepts the provider config.
+    provider = declarative_provider_from_json(provider_json)
+
+    models_url = f"{provider_config['base_url'].rstrip('/')}/v1/models"
 
     try:
-        while chunk := await stream.next_chunk():
-            if isinstance(chunk, StreamChunk.TEXT_CHUNK):
-                print(chunk.text, end="", flush=True)
-            elif isinstance(chunk, StreamChunk.END_CHUNK) and getattr(
-                chunk, "usage", None
-            ):
-                print(f"\n\nusage: {chunk.usage}", file=sys.stderr)
-            elif isinstance(chunk, StreamChunk.ERROR_CHUNK):
-                print(
-                    f"\n\nerror: {chunk.error.message}", file=sys.stderr
-                )
-    except Exception as e:
-        print(f"\n\nError during streaming: {e}", file=sys.stderr)
-        raise
-    print()
+        with urlopen(models_url, timeout=5) as response:
+            payload = json.load(response)
+    except (HTTPError, URLError) as error:
+        raise SystemExit(f"Provider smoke test failed: {error}") from error
+
+    available_models = [model["id"] for model in payload.get("data", [])]
+    if not available_models:
+        raise SystemExit("Provider is reachable but returned no models")
+
+    configured_models = [model["name"] for model in provider_config["models"]]
+    missing_models = sorted(set(configured_models) - set(available_models))
+    if missing_models:
+        raise SystemExit(
+            "Provider is reachable, but configured model(s) were not found: "
+            + ", ".join(missing_models)
+        )
+
+    print(f"Connected to provider: {provider.name()}")
+    print("Available models:")
+    for model_name in available_models:
+        print(f"- {model_name}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
 ```
 
-### How the smoke test works
+### Key ideas
 
-1. **`load_dotenv()`** — loads `.env` from cwd (repo root) so `MODEL_NAME` is available via `os.getenv`
-2. **`declarative_provider_from_json(...)`** — reads the JSON config and returns a configured provider. This validates that:
-   - The JSON is valid
-   - The engine type (`openai`) is recognized
-   - All required fields parse correctly
-3. **`ProviderModelConfig(model_name=...)`** — wraps the model name (and optionally context limit, temperature, max tokens). Base URL and auth come from the JSON config, not this object.
-4. **`ProviderMessage(role=..., content=[...])`** — builds a user message with text content
-5. **`provider.stream(model, system, messages, tools)`** — async call that returns a `ProviderStream`
-6. **Chunk loop** — iterates async chunks:
-   - `TEXT_CHUNK`: model's text output — print immediately (end="", flush=True)
-   - `END_CHUNK`: stream complete — print usage stats to stderr if available
-   - `ERROR_CHUNK`: provider error — print error message to stderr
+- `declarative_provider_from_json(...)` verifies that GDK accepts the provider configuration.
+- `load_dotenv()` makes credentials in a local `.env` available when the selected provider names an API-key environment variable.
+- `GET /v1/models` is the OpenAI-compatible model discovery request used by this lesson.
+- The five-second timeout makes a failed smoke test return promptly.
+- Comparing configured and advertised model names catches a common configuration mismatch without making an inference request.
+- No `asyncio`, `ProviderModelConfig`, `ProviderMessage`, `MessageContent`, `ProviderStream`, or `StreamChunk` code is needed yet.
 
-### Chunk types reference
+## Step 2.2: Run the smoke test
 
-| Variant | Attribute | When it arrives |
-|---|---|---|
-| `StreamChunk.TEXT_CHUNK` | `.text: str` | Each turn during generation |
-| `StreamChunk.END_CHUNK` | `.usage: Optional[Usage]` | Once at stream end |
-| `StreamChunk.ERROR_CHUNK` | `.error.message: str` | If the provider encounters an error |
+From the repository root:
 
-## Step 2.3: Run the smoke test
-
-From repo root:
 ```bash
 uv run python -m src.gdk_hello.main
 ```
 
-**Expected output:**
-- stderr (in `[2m` brackets): `Streaming response...`
-- stdout: The model's reply streaming line by line
-- stderr (at end): `usage:` with token counts and model name
+The bundled provider JSON is the default. To use another declarative provider
+configuration, pass its path as the optional positional argument:
 
-If the server is unreachable, you'll see an error message. If the config is wrong, `declarative_provider_from_json()` will raise before any streaming begins.
+```bash
+uv run python -m src.gdk_hello.main path/to/provider.json
+```
 
-### Success criteria
-- No import errors
-- Config loads without exception
-- Streaming output appears (text chunks) or a clear network error
-- Usage stats printed at end (if server returns them)
+Example successful output:
 
-## Best practices
+```text
+Connected to provider: custom_aa_llama_qwen3_6-35b
+Available models:
+- qwen3.6-35b-a3b
+```
 
-- Always run from repo root so `Path("custom_aa_llama_qwen3_6-35b.json")` resolves correctly
-- Use `python -m src.gdk_hello.main` rather than a direct file path — the `src/` layout requires the package import system
-- Print streaming text to stdout, diagnostics (usage, errors) to stderr
-- Wrap chunk iteration in try/except — network errors during streaming are common during development
-- The `tools=[]` argument is required by `stream()`; an empty list means no tool support (Lesson 5 covers tools)
+The exact provider name and model IDs depend on your configuration and llama.cpp server.
 
-## Next steps
-Once smoke test passes:
-- Lesson 3: Deepen streaming knowledge — understand chunk types, usage parsing, and error handling patterns.
-- Lesson 4: System prompt and message roles — multi-turn conversation with assistant responses
-- Lesson 5: Add first `ProviderTool` definition — enable the model to call custom functions
+## Success criteria
 
-## Questions to ask before proceeding
-- What is your exact llama.cpp base URL and model name?
-- Does streaming output appear when you run the script?
-- Are usage stats printed at the end?
+- GDK parses the declarative provider configuration.
+- The models endpoint responds successfully.
+- At least one model is returned.
+- Every model configured in the selected provider JSON appears in the response.
+
+## Next
+
+Lesson 3 makes the first inference request and introduces `ProviderModelConfig`, messages, streaming, and chunk handling.

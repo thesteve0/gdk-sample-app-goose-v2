@@ -6,7 +6,6 @@ requires-python = ">=3.11"
 dependencies = [
     "goose-sdk==0.1.0a8",
     "click",
-    "dotenv>=0.9.9",
     "python-dotenv",
 ]
 
